@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TextQuest MVP</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <main class="container">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Draft MVP &middot; Groq powered</p>
+          <h1>TextQuest</h1>
+          <p class="lede">
+            Transform dense textbook passages into explorable RPG outlines. Paste an excerpt, hit generate, and
+            instantly see levels, quests, and narrative hooks.
+          </p>
+        </div>
+        <div class="hero-card">
+          <h2>MVP Scope</h2>
+          <ul>
+            <li>Textbook processing pipeline</li>
+            <li>RPG content generator</li>
+            <li>Player progress snapshot</li>
+          </ul>
+        </div>
+      </header>
+
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h3>1. Upload or paste content</h3>
+            <p>We'll analyze the hierarchy, key concepts, and quest flow.</p>
+          </div>
+          <button id="useSample" class="ghost-button">Use sample</button>
+        </div>
+        <div class="form-grid">
+          <label>
+            <span>Textbook title</span>
+            <input type="text" id="titleInput" placeholder="e.g., Principles of Cell Biology" />
+          </label>
+          <label>
+            <span>Focus</span>
+            <input type="text" id="focusInput" placeholder="Cell metabolism, Middle school" />
+          </label>
+        </div>
+        <label class="full-width">
+          <span>Textbook excerpt</span>
+          <textarea id="textInput" rows="8" placeholder="Paste chapter text or upload a snippet..."></textarea>
+        </label>
+        <button id="processButton" class="primary-button">Generate RPG blueprint</button>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h3>2. RPG blueprint</h3>
+            <p>Levels, quests, vocabulary, and suggested assessments.</p>
+          </div>
+          <span id="processStatus" class="status-dot">Idle</span>
+        </div>
+        <div id="structureOutput" class="output-grid empty-state">
+          <p>Blueprint results will appear here.</p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h3>3. Narrative + encounters</h3>
+            <p>Ground the blueprint in NPCs, regions, and assessment encounters.</p>
+          </div>
+          <span id="narrativeStatus" class="status-dot">Idle</span>
+        </div>
+        <label class="full-width">
+          <span>Learning goal (optional)</span>
+          <textarea id="goalInput" rows="3" placeholder="Keep it fun, highlight lab safety, etc."></textarea>
+        </label>
+        <button id="narrativeButton" class="secondary-button" disabled>Generate narrative layer</button>
+        <div id="narrativeOutput" class="output-grid empty-state">
+          <p>Narrative results will appear here.</p>
+        </div>
+      </section>
+    </main>
+    <script src="app.js" type="module"></script>
+  </body>
+</html>
