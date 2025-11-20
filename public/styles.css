@@ -228,3 +228,7 @@ pre {
     align-items: flex-start;
   }
 }
+
+form {
+  display: block;
+}

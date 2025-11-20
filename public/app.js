@@ -9,6 +9,7 @@ const structureOutput = document.getElementById('structureOutput');
 const narrativeOutput = document.getElementById('narrativeOutput');
 const processStatus = document.getElementById('processStatus');
 const narrativeStatus = document.getElementById('narrativeStatus');
+const form = document.getElementById('uploadForm');
 
 let currentStructure = null;
 
@@ -76,6 +77,54 @@ useSampleButton.addEventListener('click', () => {
   titleInput.value = 'Foundations of Cell Biology';
   focusInput.value = 'Intro biology, grade 9';
   textInput.value = sampleExcerpt;
+});
+
+form.addEventListener('change', () => {
+  form.dispatchEvent(new Event('submit'));
+
+  const fileInput = document.getElementById('uploadFile');
+  const file = fileInput.files[0];
+
+  if (file) {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      textInput.value = e.target.result;
+    }
+
+    reader.onerror = (e) => {
+      console.error("Error reading file:", e.target.error);
+      fileContentTextarea.value = "Error reading file.";
+    };
+
+    reader.readAsText(file);
+  } 
+  else {
+    fileContentTextarea.value = "";
+  }
+});
+
+form.addEventListener('submit', async (event) => {
+  event.preventDefault();
+
+  const fileInput = document.getElementById('uploadFile');
+  const file = fileInput.files[0];
+
+  const formData = new FormData();
+  formData.append('uploadFile', file);
+
+  try {
+    const response = await fetch('/upload', {
+      method: 'POST',
+      body: formData,
+    });
+
+    const text = await response.text();
+    document.getElementById('message').innerText = text;
+
+  } catch (error) {
+    console.error('Error uploading file:', error);
+    document.getElementById('message').innerText = 'Error uploading file.';
+  }
 });
 
 function renderStructure(result) {

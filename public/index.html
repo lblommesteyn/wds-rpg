@@ -48,6 +48,12 @@
             <input type="text" id="focusInput" placeholder="Cell metabolism, Middle school" />
           </label>
         </div>
+        <form id='uploadForm' enctype="multipart/form-data">
+          <label>
+          File to be uploaded: <input type="file" name="uploadFile" id="uploadFile"> 
+          </label>
+        </form>
+        <div id="message" style="color:white; margin-top:5px;"></div>
         <label class="full-width">
           <span>Textbook excerpt</span>
           <textarea id="textInput" rows="8" placeholder="Paste chapter text or upload a snippet..."></textarea>

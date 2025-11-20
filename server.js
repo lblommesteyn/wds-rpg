@@ -1,4 +1,5 @@
 const express = require('express');
+const multer = require('multer')
 const cors = require('cors');
 const path = require('path');
 require('dotenv').config();
@@ -73,6 +74,19 @@ const sampleNarrative = {
     },
   ],
 };
+
+// Configure storage for uploaded files
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'uploads/'); // Files will be saved in the 'uploads/' directory
+  },
+  filename: function (req, file, cb) {
+    const sanitized = file.originalname.replace(/\s+/g, '_')
+    cb(null, `${sanitized}`);
+  }
+});
+const upload = multer({ storage: storage });
+
 
 app.use(cors());
 app.use(express.json({ limit: '5mb' }));
@@ -155,6 +169,13 @@ app.post('/api/narrative', async (req, res) => {
   }
 });
 
+app.post('/upload', upload.single('uploadFile'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ message: 'No file uploaded.' });
+  }
+  res.status(200).send('File uploaded successfully!')
+});
+
 app.listen(PORT, () => {
   console.log(`TextQuest MVP server running on http://localhost:${PORT}`);
 });
@@ -210,3 +231,5 @@ function safeJSON(text) {
 function isMissingKeyError(error) {
   return typeof error?.message === 'string' && error.message.includes('GROQ_API_KEY');
 }
+
+
