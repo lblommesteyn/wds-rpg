@@ -1,5 +1,7 @@
 const express = require('express');
-const multer = require('multer')
+const multer = require('multer');
+const fs = require('fs');
+const pdfParse = require('pdf-parse')
 const cors = require('cors');
 const path = require('path');
 require('dotenv').config();
@@ -169,11 +171,27 @@ app.post('/api/narrative', async (req, res) => {
   }
 });
 
-app.post('/upload', upload.single('uploadFile'), (req, res) => {
+app.post('/upload', upload.single('uploadFile'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ message: 'No file uploaded.' });
   }
-  res.status(200).send('File uploaded successfully!')
+
+  try {
+
+    // MUST be a buffer
+    const dataBuffer = fs.readFileSync(req.file.path);
+    const data = await pdfParse(dataBuffer);
+
+    console.log("PDF PARSE RESULT:", data);
+    res.status(200).json({
+      message: "File Uploaded and Parsed Successfully",
+      extractedText: data.text
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Failed to extract PDF content.' });
+  }
 });
 
 app.listen(PORT, () => {

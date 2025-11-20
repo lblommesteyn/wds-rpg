@@ -81,26 +81,6 @@ useSampleButton.addEventListener('click', () => {
 
 form.addEventListener('change', () => {
   form.dispatchEvent(new Event('submit'));
-
-  const fileInput = document.getElementById('uploadFile');
-  const file = fileInput.files[0];
-
-  if (file) {
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      textInput.value = e.target.result;
-    }
-
-    reader.onerror = (e) => {
-      console.error("Error reading file:", e.target.error);
-      fileContentTextarea.value = "Error reading file.";
-    };
-
-    reader.readAsText(file);
-  } 
-  else {
-    fileContentTextarea.value = "";
-  }
 });
 
 form.addEventListener('submit', async (event) => {
@@ -116,10 +96,12 @@ form.addEventListener('submit', async (event) => {
     const response = await fetch('/upload', {
       method: 'POST',
       body: formData,
-    });
+    })
 
-    const text = await response.text();
-    document.getElementById('message').innerText = text;
+    const data = await response.json()
+    document.getElementById('message').innerText = data.message;
+
+    textInput.value = data.extractedText
 
   } catch (error) {
     console.error('Error uploading file:', error);
