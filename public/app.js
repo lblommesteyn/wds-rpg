@@ -36,10 +36,12 @@ processButton.addEventListener('click', async () => {
 
     const result = await response.json();
     renderStructure(result);
-  } catch (error) {
+  } 
+  catch (error) {
     structureOutput.classList.remove('empty-state');
     structureOutput.innerHTML = `<div class="card"><h4>Error</h4><p>${error.message}</p></div>`;
-  } finally {
+  } 
+  finally {
     toggleButtons(false);
     setStatus(processStatus, 'Idle', false);
   }
@@ -93,7 +95,7 @@ form.addEventListener('submit', async (event) => {
   formData.append('uploadFile', file);
 
   try {
-    const response = await fetch('/upload', {
+    const response = await fetch('/upload?forceOCR=1', {
       method: 'POST',
       body: formData,
     })

@@ -4,6 +4,8 @@ const fs = require('fs');
 const pdfParse = require('pdf-parse')
 const cors = require('cors');
 const path = require('path');
+const { execSync } = require('child_process');
+const pdfToImages = require('./pdfToImages');
 require('dotenv').config();
 
 const fetch = (...args) => import('node-fetch').then(({ default: fetchFn }) => fetchFn(...args));
@@ -120,6 +122,9 @@ app.post('/api/process', async (req, res) => {
   try {
     const { content, usage } = await callGroq(messages, { responseFormat: 'json_object' });
     const structured = safeJSON(content) ?? { raw: content };
+    console.log("=== /api/process OUTPUT ===");
+    console.log(JSON.stringify(structured, null, 2));
+    console.log("===========================");
     return res.json({ title, structured, usage, via: 'groq' });
   } catch (error) {
     if (isMissingKeyError(error)) {
@@ -157,6 +162,9 @@ app.post('/api/narrative', async (req, res) => {
   try {
     const { content, usage } = await callGroq(messages, { responseFormat: 'json_object' });
     const narrative = safeJSON(content) ?? { raw: content };
+    console.log("=== /api/narrative OUTPUT ===");
+    console.log(JSON.stringify(narrative, null, 2));
+    console.log("==============================");
     return res.json({ narrative, usage, via: 'groq' });
   } catch (error) {
     if (isMissingKeyError(error)) {
@@ -171,21 +179,55 @@ app.post('/api/narrative', async (req, res) => {
   }
 });
 
+async function runOCR(pdfPath) {
+  try {
+    const images = await pdfToImages(pdfPath);
+    let fullText = "";
+
+    const pythonPath = path.join(__dirname, "ocr_env", "Scripts", "python.exe");
+
+    for (const img of images) {
+      console.log("Running OCR on:", img);
+      const command = `"${pythonPath}" ocr.py "${img}"`;
+      const output = execSync(command, { encoding: "utf-8" });
+      console.log("OCR raw output:", output);
+      
+      const jsonOut = JSON.parse(output);
+      fullText += jsonOut.ocr_text + "\n";
+    }
+
+    return fullText.trim();
+  } catch (err) {
+    console.error("OCR failed:", err);
+    return "";
+  }
+}
+
 app.post('/upload', upload.single('uploadFile'), async (req, res) => {
+  const forceOCR = req.query.forceOCR === "1";
+
   if (!req.file) {
     return res.status(400).json({ message: 'No file uploaded.' });
   }
 
   try {
-
-    // MUST be a buffer
     const dataBuffer = fs.readFileSync(req.file.path);
-    const data = await pdfParse(dataBuffer);
+    const pdfData = await pdfParse(dataBuffer);
 
-    console.log("PDF PARSE RESULT:", data);
+    let extractedText = pdfData.text || "";
+
+    const isWeak = extractedText.trim().length < 50;
+    const hasSuspectPages = pdfData.numpages > 0 && extractedText.split("\n").length < 5;
+
+    if (forceOCR || isWeak || hasSuspectPages) {
+      console.log("Forcing OCR...");
+      const ocrText = await runOCR(req.file.path);
+      extractedText = ocrText || extractedText;
+    }
+
     res.status(200).json({
       message: "File Uploaded and Parsed Successfully",
-      extractedText: data.text
+      extractedText
     });
 
   } catch (error) {
@@ -217,7 +259,7 @@ async function callGroq(messages, { responseFormat } = {}) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+      'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
     },
     body: JSON.stringify(body),
   });
