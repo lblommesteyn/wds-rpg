@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 require('dotenv').config();
 
 const fetch = (...args) => import('node-fetch').then(({ default: fetchFn }) => fetchFn(...args));
@@ -78,8 +79,42 @@ app.use(cors());
 app.use(express.json({ limit: '5mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  next();
+});
+
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: Date.now() });
+});
+
+app.get('/', (req, res) => {
+  const indexPath = path.join(__dirname, 'public', 'index.html');
+  console.log('Serving index.html from:', indexPath);
+  
+  if (fs.existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    res.status(404).send('index.html not found at: ' + indexPath);
+  }
+});
+
+// Dashboard route
+app.get('/dashboard', (req, res) => {
+  const dashboardPath = path.join(__dirname, 'public', 'dashboard.html');
+  console.log('Serving dashboard.html from:', dashboardPath);
+  console.log('File exists?', fs.existsSync(dashboardPath));
+  
+  if (fs.existsSync(dashboardPath)) {
+    res.sendFile(dashboardPath);
+  } else {
+    res.status(404).send(`
+      <h1>Dashboard Not Found</h1>
+      <p>Looking for: ${dashboardPath}</p>
+      <p>Please ensure dashboard.html exists in the public folder.</p>
+      <p><a href="/">Return to Main App</a></p>
+    `);
+  }
 });
 
 app.post('/api/process', async (req, res) => {
@@ -155,8 +190,35 @@ app.post('/api/narrative', async (req, res) => {
   }
 });
 
+app.use((req, res) => {
+  res.status(404).send(`
+    <h1>404 - Page Not Found</h1>
+    <p>Path: ${req.path}</p>
+    <p><a href="/">Go to Main App</a></p>
+    <p><a href="/dashboard">Go to Dashboard</a></p>
+  `);
+});
+
 app.listen(PORT, () => {
-  console.log(`TextQuest MVP server running on http://localhost:${PORT}`);
+  console.log('='.repeat(60));
+  console.log(`✓ TextQuest MVP server running on port ${PORT}`);
+  console.log('='.repeat(60));
+  console.log(`Main app:  http://localhost:${PORT}/`);
+  console.log(`Dashboard: http://localhost:${PORT}/dashboard`);
+  console.log(`Health:    http://localhost:${PORT}/api/health`);
+  console.log('='.repeat(60));
+  
+  // Check if required files exist
+  const publicDir = path.join(__dirname, 'public');
+  const requiredFiles = ['index.html', 'dashboard.html', 'dashboard.js', 'dashboard.css', 'data_class.js', 'mockUserData.js'];
+  
+  console.log('\nChecking required files:');
+  requiredFiles.forEach(file => {
+    const filePath = path.join(publicDir, file);
+    const exists = fs.existsSync(filePath);
+    console.log(`  ${exists ? '✓' : '✗'} ${file}`);
+  });
+  console.log('='.repeat(60));
 });
 
 async function callGroq(messages, { responseFormat } = {}) {
