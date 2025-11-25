@@ -9,6 +9,12 @@ const structureOutput = document.getElementById('structureOutput');
 const narrativeOutput = document.getElementById('narrativeOutput');
 const processStatus = document.getElementById('processStatus');
 const narrativeStatus = document.getElementById('narrativeStatus');
+const uploadInput = document.getElementById('uploadFile');
+const uploadMessage = document.getElementById('uploadMessage');
+const clearInputButton = document.getElementById('clearInput');
+const graphButton = document.getElementById('graphButton');
+const graphStatus = document.getElementById('graphStatus');
+const graphOutput = document.getElementById('graphOutput');
 
 let currentStructure = null;
 
@@ -72,17 +78,80 @@ narrativeButton.addEventListener('click', async () => {
   }
 });
 
+graphButton.addEventListener('click', async () => {
+  if (!currentStructure) return;
+  setStatus(graphStatus, 'Building...', true);
+  graphButton.disabled = true;
+  try {
+    const payload = {
+      structured: currentStructure,
+      title: titleInput.value.trim(),
+      focus: focusInput.value.trim(),
+      savePersistently: true,
+    };
+
+    const response = await fetch('/api/graphs/from-structure', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to generate concept graph.');
+    }
+
+    const result = await response.json();
+    renderGraph(result);
+  } catch (error) {
+    graphOutput.classList.remove('empty-state');
+    graphOutput.innerHTML = `<div class="card"><h4>Error</h4><p>${error.message}</p></div>`;
+  } finally {
+    graphButton.disabled = !currentStructure;
+    setStatus(graphStatus, 'Idle', false);
+  }
+});
+
 useSampleButton.addEventListener('click', () => {
   titleInput.value = 'Foundations of Cell Biology';
   focusInput.value = 'Intro biology, grade 9';
   textInput.value = sampleExcerpt;
 });
 
+uploadInput?.addEventListener('change', async (event) => {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  uploadMessage.textContent = 'Extracting text...';
+  uploadMessage.classList.add('loading');
+
+  try {
+    const extractedText = await extractTextFromFile(file);
+    textInput.value = extractedText;
+    uploadMessage.textContent = `Loaded ${file.name} (${extractedText.length.toLocaleString()} chars)`;
+  } catch (error) {
+    uploadMessage.textContent = `Could not read ${file.name}: ${error.message}`;
+  } finally {
+    uploadMessage.classList.remove('loading');
+  }
+});
+
+clearInputButton?.addEventListener('click', () => {
+  textInput.value = '';
+  uploadInput.value = '';
+  uploadMessage.textContent = '';
+});
+
 function renderStructure(result) {
   const { structured, via, title } = result;
   currentStructure = structured;
   narrativeButton.disabled = false;
+  graphButton.disabled = false;
   structureOutput.classList.remove('empty-state');
+  graphOutput.classList.add('empty-state');
+  graphOutput.innerHTML = '<p>Build a concept graph to see dependencies.</p>';
+  if (structured) {
+    localStorage.setItem('textquest_structure', JSON.stringify(structured));
+  }
   let html = '';
 
   if (structured?.levels?.length) {
@@ -170,23 +239,109 @@ function renderNarrative(result) {
   narrativeOutput.innerHTML = html;
 }
 
+function renderGraph(result) {
+  const { graph, persistence } = result ?? {};
+  if (!graph) {
+    graphOutput.classList.remove('empty-state');
+    graphOutput.innerHTML = `<div class="card"><h4>No graph returned</h4><p>Try building again.</p></div>`;
+    return;
+  }
+
+  const topics = Object.entries(graph.metadata?.topics || {});
+  const nodesPreview = (graph.nodes || []).slice(0, 6);
+
+  graphOutput.classList.remove('empty-state');
+  let html = `<div class="badge">Concept graph | ${graph.metadata?.embeddingModel || 'mock'}${
+    persistence?.filename ? ' · saved' : ''
+  }</div>`;
+
+  html += `<article class="card">
+    <h4>Overview</h4>
+    <p>${graph.metadata?.totalConcepts || 0} concepts · ${graph.metadata?.totalEdges || 0} links</p>
+  </article>`;
+
+  if (topics.length) {
+    html += `<article class="card"><h4>Topics</h4>${topics
+      .map(([topic, data]) => {
+        const avg = typeof data.avgDifficulty === 'number' ? data.avgDifficulty.toFixed(1) : 'n/a';
+        return `<p><strong>${topic}</strong> · ${data.nodeCount} concepts · avg difficulty ${avg} · types: ${
+          data.types?.join(', ') || 'n/a'
+        }</p>`;
+      })
+      .join('')}</article>`;
+  }
+
+  if (nodesPreview.length) {
+    html += `<article class="card"><h4>Highlights</h4>${nodesPreview
+      .map(
+        (node) =>
+          `<p><strong>${node.name}</strong> (${node.type}) · ${node.topic || 'Topic'} · difficulty ${node.difficulty}</p>`
+      )
+      .join('')}</article>`;
+  }
+
+  graphOutput.innerHTML = html;
+  localStorage.setItem('textquest_graph', JSON.stringify(graph));
+}
+
 function clearStructure() {
   currentStructure = null;
+  localStorage.removeItem('textquest_structure');
+  localStorage.removeItem('textquest_graph');
   narrativeButton.disabled = true;
+  graphButton.disabled = true;
   structureOutput.classList.add('empty-state');
   structureOutput.innerHTML = '<p>Crunching blueprint...</p>';
   narrativeOutput.innerHTML = '<p>Narrative results will appear here.</p>';
   narrativeOutput.classList.add('empty-state');
+  graphOutput.innerHTML = '<p>Concept graph will appear here.</p>';
+  graphOutput.classList.add('empty-state');
 }
 
 function toggleButtons(isLoading) {
   processButton.disabled = isLoading;
   narrativeButton.disabled = isLoading || !currentStructure;
+  graphButton.disabled = isLoading || !currentStructure;
 }
 
 function setStatus(el, text, loading) {
   el.textContent = text;
   el.classList.toggle('loading', loading);
+}
+
+async function extractTextFromFile(file) {
+  const isPdf = file.type === 'application/pdf' || file.name?.toLowerCase().endsWith('.pdf');
+  if (isPdf) {
+    return extractTextFromPdf(file);
+  }
+  if (typeof file.text === 'function') {
+    return file.text();
+  }
+  throw new Error('Unsupported file type');
+}
+
+async function extractTextFromPdf(file) {
+  if (!window.pdfjsLib) {
+    throw new Error('PDF.js failed to load');
+  }
+
+  const workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.worker.min.js';
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
+
+  const buffer = await file.arrayBuffer();
+  const pdf = await window.pdfjsLib.getDocument({ data: buffer }).promise;
+
+  let text = '';
+  const maxPages = Math.min(pdf.numPages, 10);
+
+  for (let pageNum = 1; pageNum <= maxPages; pageNum++) {
+    const page = await pdf.getPage(pageNum);
+    const content = await page.getTextContent();
+    text += content.items.map((item) => item.str).join(' ') + '\n';
+    if (text.length > 20000) break;
+  }
+
+  return text.trim();
 }
 
 const sampleExcerpt = `Cells are the smallest units of life. Each cell contains organelles that specialize in a task:

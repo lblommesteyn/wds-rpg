@@ -8,6 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.min.js"></script>
   </head>
   <body>
     <main class="container">
@@ -48,6 +49,14 @@
             <input type="text" id="focusInput" placeholder="Cell metabolism, Middle school" />
           </label>
         </div>
+        <div class="upload-row">
+          <label class="file-label">
+            <span>Upload PDF or text</span>
+            <input type="file" id="uploadFile" accept=".pdf,.txt,.md,.rtf" />
+          </label>
+          <button id="clearInput" class="ghost-button" type="button">Clear text</button>
+        </div>
+        <p id="uploadMessage" class="helper-text"></p>
         <label class="full-width">
           <span>Textbook excerpt</span>
           <textarea id="textInput" rows="8" placeholder="Paste chapter text or upload a snippet..."></textarea>
@@ -71,7 +80,24 @@
       <section class="panel">
         <div class="panel-header">
           <div>
-            <h3>3. Narrative + encounters</h3>
+            <h3>3. Concept graph</h3>
+            <p>Cluster quests and items into topics and save a dependency graph.</p>
+          </div>
+          <span id="graphStatus" class="status-dot">Idle</span>
+        </div>
+        <div class="button-row">
+          <button id="graphButton" class="secondary-button" disabled>Build concept graph</button>
+          <a class="ghost-button" href="quest-graph-panel.html" target="_blank" rel="noreferrer">Open quest graph viewer</a>
+        </div>
+        <div id="graphOutput" class="output-grid empty-state">
+          <p>Generate a blueprint first to unlock graphing.</p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h3>4. Narrative + encounters</h3>
             <p>Ground the blueprint in NPCs, regions, and assessment encounters.</p>
           </div>
           <span id="narrativeStatus" class="status-dot">Idle</span>

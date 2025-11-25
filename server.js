@@ -4,10 +4,14 @@ const path = require('path');
 require('dotenv').config();
 
 const fetch = (...args) => import('node-fetch').then(({ default: fetchFn }) => fetchFn(...args));
+const GraphPersistence = require('./lib/persistence');
+const TopicGraphGenerator = require('./lib/graphGenerator');
+const EmbeddingsManager = require('./lib/embeddings');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const GROQ_MODEL = process.env.GROQ_MODEL || 'llama3-8b-8192';
+const DATA_DIR = path.join(__dirname, 'data', 'graphs');
 
 const sampleStructure = {
   levels: [
@@ -74,12 +78,24 @@ const sampleNarrative = {
   ],
 };
 
+const persistence = new GraphPersistence(DATA_DIR);
+const embeddingsManager = new EmbeddingsManager(process.env.OPENAI_API_KEY, 'openai');
+
+persistence.initializeDirectory().catch((error) => {
+  console.error('Failed to initialize graph data directory', error);
+});
+
 app.use(cors());
 app.use(express.json({ limit: '5mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: Date.now() });
+  res.json({
+    status: 'ok',
+    timestamp: Date.now(),
+    features: ['process', 'narrative', 'concept-graphs', 'embeddings'],
+    embeddingsMode: embeddingsManager.method,
+  });
 });
 
 app.post('/api/process', async (req, res) => {
@@ -152,6 +168,107 @@ app.post('/api/narrative', async (req, res) => {
     }
     console.error('[narrative] Failed', error);
     return res.status(500).json({ error: 'Failed to craft narrative content' });
+  }
+});
+
+app.post('/api/graphs/from-structure', async (req, res) => {
+  const { structured, title = 'Untitled Textbook', focus = 'general', savePersistently = false } = req.body ?? {};
+  if (!structured) {
+    return res.status(400).json({ error: 'Structured RPG data is required' });
+  }
+
+  try {
+    const generator = new TopicGraphGenerator(structured, embeddingsManager);
+    const graph = await generator.generateGraph();
+
+    let persistenceResult = null;
+    if (savePersistently) {
+      persistenceResult = await persistence.saveGraph(graph, title, { focus, source: 'structured' });
+    }
+
+    return res.json({
+      success: true,
+      graph,
+      persistence: persistenceResult,
+    });
+  } catch (error) {
+    console.error('[graphs] Failed to generate graph', error);
+    return res.status(500).json({ error: 'Failed to generate graph' });
+  }
+});
+
+app.get('/api/graphs/list', async (_req, res) => {
+  try {
+    const graphs = await persistence.listGraphs();
+    return res.json({ success: true, count: graphs.length, graphs });
+  } catch (error) {
+    console.error('[graphs] Failed to list graphs', error);
+    return res.status(500).json({ error: 'Failed to list graphs' });
+  }
+});
+
+app.get('/api/graphs/:filename/export', async (req, res) => {
+  try {
+    const { filename } = req.params;
+    const { format = 'json' } = req.query;
+    const exported = await persistence.exportGraph(filename, format);
+
+    if (format === 'gexf') {
+      res.setHeader('Content-Type', 'application/xml');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}.gexf"`);
+    } else if (format === 'csv') {
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}.csv"`);
+    } else {
+      res.setHeader('Content-Type', 'application/json');
+    }
+
+    return res.send(exported);
+  } catch (error) {
+    console.error('[graphs] Failed to export graph', error);
+    return res.status(500).json({ error: 'Failed to export graph' });
+  }
+});
+
+app.get('/api/graphs/:filename', async (req, res) => {
+  try {
+    const { filename } = req.params;
+    const graph = await persistence.loadGraph(filename);
+    return res.json({ success: true, graph });
+  } catch (error) {
+    console.error('[graphs] Failed to load graph', error);
+    return res.status(404).json({ error: 'Graph not found' });
+  }
+});
+
+app.delete('/api/graphs/:filename', async (req, res) => {
+  try {
+    const { filename } = req.params;
+    const result = await persistence.deleteGraph(filename);
+    return res.json({ success: true, ...result });
+  } catch (error) {
+    console.error('[graphs] Failed to delete graph', error);
+    return res.status(500).json({ error: 'Failed to delete graph' });
+  }
+});
+
+app.post('/api/embeddings/similarity', async (req, res) => {
+  const { texts } = req.body ?? {};
+  if (!Array.isArray(texts) || texts.length < 2) {
+    return res.status(400).json({ error: 'At least two texts are required' });
+  }
+
+  try {
+    const { embeddings, matrix } = await embeddingsManager.getSimilarityMatrix(texts);
+    return res.json({
+      success: true,
+      texts,
+      embeddings,
+      similarityMatrix: matrix,
+    });
+  } catch (error) {
+    console.error('[embeddings] Failed to compute similarity', error);
+    return res.status(500).json({ error: 'Failed to compute similarity' });
   }
 });
 
