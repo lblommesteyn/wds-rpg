@@ -10,7 +10,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     initializeDashboard();
     setupDrawerToggles();
-    setupActionButtons();
 });
 
 // ----------------- Main Initialization -----------------
@@ -98,16 +97,6 @@ function populateVocabularyProgress() {
             <p class="vocab-description">${word.description}</p>
         </div>
     `).join('');
-    
-    // Flashcard review button handler
-    document.getElementById('flashcardReview').addEventListener('click', () => {
-        const unlearnedWords = vocab.filter(v => !v.isLearned);
-        if (unlearnedWords.length > 0) {
-            alert(`You have ${unlearnedWords.length} words to review:\n${unlearnedWords.map(w => w.term).join(', ')}`);
-        } else {
-            alert('Congratulations! You have learned all vocabulary words!');
-        }
-    });
 }
 
 // ----------------- Quest Details -----------------
@@ -254,22 +243,6 @@ function setInitialDrawerStates() {
         if (savedState === 'collapsed') {
             drawer.classList.add('collapsed');
         }
-    });
-}
-
-function setupActionButtons() {
-    document.getElementById('continueQuestBtn').addEventListener('click', () => {
-        alert(`Continuing quest: ${currentUser.currentQuest}\n\nThis would navigate to the quest/game interface.`);
-        // In a real app: window.location.href = '/quest';
-    });
-    
-    document.getElementById('viewMapBtn').addEventListener('click', () => {
-        const regions = currentUser.RegionProgress.map((r, i) => 
-            `${i + 1}. ${r.name} - ${r.isExplored ? '✓ Explored' : '🔒 Locked'}`
-        ).join('\n');
-        
-        alert(`World Map:\n\n${regions}\n\nThis would navigate to the world map view.`);
-        // In a real app: window.location.href = '/map';
     });
 }
 

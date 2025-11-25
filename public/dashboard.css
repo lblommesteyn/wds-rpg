@@ -509,11 +509,5 @@
         grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
     }
     
-    .action-section {
-        flex-direction: column;
-    }
-    
-    .action-section button {
-        width: 100%;
-    }
+
 }
