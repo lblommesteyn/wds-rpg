@@ -118,20 +118,47 @@ app.post('/api/process', async (req, res) => {
   ];
 
   try {
-    const { content, usage } = await callGroq(messages, { responseFormat: 'json_object' });
-    const structured = safeJSON(content) ?? { raw: content };
-    return res.json({ title, structured, usage, via: 'groq' });
-  } catch (error) {
+    const { content, usage } = await callGroq(messages, { responseFormat: 'json_object', retry: { maxRetries: 3 } });
+
+    const structured = safeJSON(content);
+    const responsePayload = {title, structured: structured ?? { raw: content }, usage, via: 'groq'};
+
+    if (!structured) {responsePayload.warnings = ['GROQ_PARSE_ERROR'];}
+
+    return res.json(responsePayload);
+  } 
+  catch (error) {
     if (isMissingKeyError(error)) {
-      return res.json({
-        title,
-        structured: sampleStructure,
-        via: 'mock',
-        message: 'Set GROQ_API_KEY to replace mock data.',
+      return res.json({title, structured: sampleStructure, via: 'mock', message: 'Set GROQ_API_KEY to replace mock data.'});
+    }
+
+    if (error instanceof GroqError) {
+      console.error('[process] GroqError', { type: error.type, status: error.status });
+
+      if (error.type === 'RATE_LIMIT' || error.status === 429) {
+        return res.status(503).json({
+          error: 'TextQuest is temporarily rate limited by the AI provider. Please wait a moment and try again.',
+          code: 'GROQ_RATE_LIMIT',
+          status: error.status,
+        });
+      }
+
+      if (error.type === 'PARSE_ERROR') {
+        return res.status(502).json({
+          error: 'We had trouble understanding the AI response. Please try again.',
+          code: 'GROQ_PARSE_ERROR',
+          status: error.status,
+        });
+      }
+
+      return res.status(502).json({
+        error: 'The AI service is currently unavailable. Please try again.',
+        code: 'GROQ_UPSTREAM_ERROR',
+        status: error.status,
       });
     }
     console.error('[process] Failed', error);
-    return res.status(500).json({ error: 'Failed to build RPG structure' });
+    return res.status(500).json({ error: 'Failed to build RPG structure', code: 'UNKNOWN_SERVER_ERROR' });
   }
 });
 
@@ -155,10 +182,17 @@ app.post('/api/narrative', async (req, res) => {
   ];
 
   try {
-    const { content, usage } = await callGroq(messages, { responseFormat: 'json_object' });
-    const narrative = safeJSON(content) ?? { raw: content };
-    return res.json({ narrative, usage, via: 'groq' });
-  } catch (error) {
+    const { content, usage } = await callGroq(messages, { responseFormat: 'json_object', retry: { maxRetries: 3 } });
+    const narrative = safeJSON(content);
+    const responsePayload = { narrative: narrative ?? { raw: content }, usage, via: 'groq' };
+
+    if (!narrative) {
+      responsePayload.warnings = ['GROQ_PARSE_ERROR'];
+    }
+    
+    return res.json(responsePayload);
+  } 
+  catch (error) {
     if (isMissingKeyError(error)) {
       return res.json({
         narrative: sampleNarrative,
@@ -166,8 +200,38 @@ app.post('/api/narrative', async (req, res) => {
         message: 'Set GROQ_API_KEY to replace mock data.',
       });
     }
+
+    if (error instanceof GroqError) {
+      console.error(
+        '[narrative] GroqError',
+        { type: error.type, status: error.status }
+      );
+
+      if (error.type === 'RATE_LIMIT' || error.status === 429) {
+        return res.status(503).json({
+          error: 'Narrative generation is temporarily rate limited. Please wait a moment and try again.',
+          code: 'GROQ_RATE_LIMIT',
+          status: error.status,
+        });
+      }
+
+      if (error.type === 'PARSE_ERROR') {
+        return res.status(502).json({
+          error: 'We had trouble understanding the AI response for narrative. Please try again.',
+          code: 'GROQ_PARSE_ERROR',
+          status: error.status,
+        });
+      }
+
+      return res.status(502).json({
+        error: 'The AI narrative service is currently unavailable. Please try again.',
+        code: 'GROQ_UPSTREAM_ERROR',
+        status: error.status,
+      });
+    }
+
     console.error('[narrative] Failed', error);
-    return res.status(500).json({ error: 'Failed to craft narrative content' });
+    return res.status(500).json({ error: 'Failed to craft narrative content', code: 'UNKNOWN_SERVER_ERROR' });
   }
 });
 
@@ -276,7 +340,27 @@ app.listen(PORT, () => {
   console.log(`TextQuest MVP server running on http://localhost:${PORT}`);
 });
 
-async function callGroq(messages, { responseFormat } = {}) {
+class GroqError extends Error {
+  constructor(message, { status, body, type } = {}) {
+    super(message);
+    this.name = 'GroqError';
+    this.status = status ?? null;
+    this.body = body ?? null;
+    this.type = type ?? 'UNKNOWN';
+  }
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getBackoffDelayMs(attemptIndex, baseMs = 500, factor = 2, jitterMs = 250) {
+  const exp = baseMs * Math.pow(factor, attemptIndex);
+  const jitter = Math.random() * jitterMs;
+  return Math.round(exp + jitter);
+}
+
+async function callGroq(messages, { responseFormat, retry = {} } = {}) {
   if (!process.env.GROQ_API_KEY) {
     throw new Error('GROQ_API_KEY missing');
   }
@@ -291,27 +375,120 @@ async function callGroq(messages, { responseFormat } = {}) {
     body.response_format = { type: 'json_object' };
   }
 
-  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-    },
-    body: JSON.stringify(body),
-  });
+  const maxRetries = retry?.maxRetries ?? 3;
+  const baseDelayMs = retry?.baseDelayMs ?? 500;
+  const backoffFactor = retry?.backoffFactor ?? 2;
+  const jitterMs = retry?.jitterMs ?? 250;
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Groq API error: ${response.status} ${errorText}`);
+  let lastError;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const attemptNumber = attempt + 1;
+  
+    try {
+      // Error Testing
+      if (process.env.SIMULATE_GROQ === 'rate_limit') {
+        throw new GroqError("Simulated rate limit", { status: 429, type: "RATE_LIMIT" });
+      }
+      if (process.env.SIMULATE_GROQ === 'parse_error') {
+        throw new GroqError("Simulated malformed JSON", { status: 200, type: "PARSE_ERROR" });
+      }
+      if (process.env.SIMULATE_GROQ === 'server_error') {
+        throw new GroqError("Simulated upstream failure", { status: 503, type: "SERVER_ERROR" });
+      }
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+        },
+        body: JSON.stringify(body),
+      });
+
+      const rawBody = await response.text().catch(() => '');
+
+      if (!response.ok) {
+        const status = response.status;
+        const type =
+          status === 429
+            ? 'RATE_LIMIT'
+            : status >= 500
+            ? 'SERVER_ERROR'
+            : 'HTTP_ERROR';
+
+        const error = new GroqError(
+          `Groq API error: ${status}`,
+          { status, body: rawBody, type }
+        );
+
+        const retryable = status === 429 || (status >= 500 && status < 600);
+        if (retryable && attempt < maxRetries) {
+          const delay = getBackoffDelayMs(attempt, baseDelayMs, backoffFactor, jitterMs);
+          console.warn(
+            `[groq] Attempt ${attemptNumber} failed (status=${status}, type=${type}). Retrying in ${delay}ms`
+          );
+          await sleep(delay);
+          lastError = error;
+          continue;
+        }
+
+        console.error(
+          `[groq] Giving up after attempt ${attemptNumber}. status=${status} type=${type}`,
+          error
+        );
+        throw error;
+      }
+
+      let data;
+      try {
+        data = JSON.parse(rawBody);
+      } catch (parseError) {
+        const error = new GroqError('Failed to parse Groq API JSON response', {
+          status: response.status,
+          body: rawBody,
+          type: 'PARSE_ERROR',
+        });
+        console.error('[groq] JSON parse error on Groq response', error);
+        throw error;
+      }
+
+      const content = data?.choices?.[0]?.message?.content;
+      if (!content) {
+        const error = new GroqError('Groq API returned no content', {
+          status: response.status,
+          body: rawBody,
+          type: 'NO_CONTENT',
+        });
+        console.error('[groq] No content from Groq', error);
+        throw error;
+      }
+
+      return { content, usage: data.usage };
+    } catch (error) {
+      const isGroqError = error instanceof GroqError;
+      const status = isGroqError ? error.status : null;
+      const type = isGroqError ? error.type : 'UNEXPECTED';
+
+      const retryable = status === 429 || (status >= 500 && status < 600) || status === null;
+
+      if (retryable && attempt < maxRetries) {
+        const delay = getBackoffDelayMs(attempt, baseDelayMs, backoffFactor, jitterMs);
+        console.warn(
+          `[groq] Attempt ${attemptNumber} failed (status=${status}, type=${type}). Retrying in ${delay}ms`
+        );
+        await sleep(delay);
+        lastError = error;
+        continue;
+      }
+
+      console.error(
+        `[groq] Giving up after attempt ${attemptNumber}. status=${status} type=${type} message=${error.message}`
+      );
+      throw error;
+    }
   }
 
-  const data = await response.json();
-  const content = data?.choices?.[0]?.message?.content;
-  if (!content) {
-    throw new Error('Groq API returned no content');
-  }
-
-  return { content, usage: data.usage };
+  throw lastError ?? new Error('Unknown Groq failure');
 }
 
 function safeJSON(text) {
