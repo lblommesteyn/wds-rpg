@@ -30,6 +30,11 @@ const PORT = process.env.PORT || 3000;
 const GROQ_MODEL = process.env.GROQ_MODEL || 'llama3-8b-8192';
 const DATA_DIR = path.join(__dirname, 'data', 'graphs');
 
+const persistence = new GraphPersistence(DATA_DIR);
+const embeddingsManager = new EmbeddingsManager({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
 const sampleStructure = {
   levels: [
     {
