@@ -16,10 +16,12 @@ const graphButton = document.getElementById('graphButton');
 const graphStatus = document.getElementById('graphStatus');
 const graphOutput = document.getElementById('graphOutput');
 const form = document.getElementById('uploadForm');
+const toastContainer = document.getElementById('toastContainer');
 
 let currentStructure = null;
 
 processButton.addEventListener('click', async () => {
+
   clearStructure();
   setStatus(processStatus, 'Generating...', true);
   toggleButtons(true);
@@ -36,18 +38,39 @@ processButton.addEventListener('click', async () => {
       body: JSON.stringify(payload),
     });
 
-    if (!response.ok) {
-      throw new Error('Failed to generate RPG blueprint.');
+    let result;
+    try {
+      result = await response.json();
+    } catch (parseError) {
+      showToast('Received an unexpected response from the server. Please try again.', 'error');
+      throw new Error('Unexpected server response');
     }
 
-    const result = await response.json();
+    if (!response.ok) {
+      const friendly = result?.error || 'Failed to generate RPG blueprint.';
+      const code = result?.code;
+      const message = code ? `${friendly} (${code})` : friendly;
+
+      throw new Error(message);
+    }
+
+    if (Array.isArray(result.warnings) && result.warnings.includes('GROQ_PARSE_ERROR')) {
+      showToast('AI response was slightly malformed. Showing best-effort result.', 'warning');
+    }
+
     renderStructure(result);
   }
   catch (error) {
     structureOutput.classList.remove('empty-state');
     structureOutput.innerHTML = `<div class="card"><h4>Error</h4><p>${error.message}</p></div>`;
-  }
-  finally {
+    if (!navigator.onLine) {
+      showToast('You appear to be offline. Please check your internet connection.', 'error');
+    } else if (error?.message) {
+      showToast(error.message, 'error');
+    } else {
+      showToast('Something went wrong while generating the RPG blueprint.', 'error');
+    }
+  } finally {
     toggleButtons(false);
     setStatus(processStatus, 'Idle', false);
   }
@@ -67,14 +90,38 @@ narrativeButton.addEventListener('click', async () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    if (!response.ok) {
-      throw new Error('Failed to generate narrative layer.');
+
+    let result;
+    try {
+      result = await response.json();
+    } catch (parseError) {
+      showToast('Received an unexpected response from the server. Please try again.', 'error');
+      throw new Error('Unexpected server response');
     }
-    const result = await response.json();
+
+    if (!response.ok) {
+      const friendly = result?.error || 'Failed to generate narrative layer.';
+      const code = result?.code;
+      const message = code ? `${friendly} (${code})` : friendly;
+      throw new Error(message);
+    }
+
+    if (Array.isArray(result.warnings) && result.warnings.includes('GROQ_PARSE_ERROR')) {
+      showToast('AI response was slightly malformed. Showing best-effort narrative.', 'warning');
+    }
+
     renderNarrative(result);
   } catch (error) {
     narrativeOutput.classList.remove('empty-state');
     narrativeOutput.innerHTML = `<div class="card"><h4>Error</h4><p>${error.message}</p></div>`;
+
+    if (!navigator.onLine) {
+      showToast('You appear to be offline. Please check your internet connection.', 'error');
+    } else if (error?.message) {
+      showToast(error.message, 'error');
+    } else {
+      showToast('Something went wrong while generating the narrative.', 'error');
+    }
   } finally {
     narrativeButton.disabled = false;
     setStatus(narrativeStatus, 'Idle', false);
@@ -376,6 +423,25 @@ async function extractTextFromPdf(file) {
   }
 
   return text.trim();
+}
+
+function showToast(message, type = 'info') {
+  if (!toastContainer || !message) return;
+
+  const toast = document.createElement('div');
+  toast.className = `toast toast--${type}`;
+  toast.textContent = message;
+
+  // click to dismiss
+  toast.addEventListener('click', () => {
+    toast.remove();
+  });
+
+  toastContainer.appendChild(toast);
+
+  setTimeout(() => {
+    toast.remove();
+  }, 5000);
 }
 
 const sampleExcerpt = `Cells are the smallest units of life. Each cell contains organelles that specialize in a task:

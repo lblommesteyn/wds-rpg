@@ -14,3 +14,7 @@ package-lock.backup*
 # OS cruft
 .DS_Store
 Thumbs.db
+
+
+#ocr_env
+ocr_env/
