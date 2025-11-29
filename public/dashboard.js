@@ -279,3 +279,9 @@ function setupGameToggle() {
 }
 
 export { initializeDashboard, currentUser };
+
+document.addEventListener('DOMContentLoaded', () => {
+    initializeDashboard();
+    setupDrawerToggles();
+    setupGameToggle();
+});

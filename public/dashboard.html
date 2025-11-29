@@ -28,63 +28,30 @@
         <!-- Header Section -->
         <header class="dashboard-hero">
             <div class="welcome-section">
-                <h1 id="welcomeMessage">Welcome Back, <span id="userName">Player</span>!</h1>
-                <div class="hero-stats">
-                    <div class="stat-item">
-                        <span class="stat-label">Region:</span>
-                        <span class="stat-value" id="currentRegion">Loading...</span>
+                <svg class="drawer-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                </svg>
+                <h3>Vocabulary Progress</h3>
+            </div>
+            <button class="drawer-toggle" aria-label="Toggle vocabulary progress">
+                <svg class="chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+            </button>
+            </div>
+            <div class="drawer-content">
+                <div id="vocabularyProgressContent">
+                    <div class="vocab-stats">
+                        <span id="vocabCount">0 / 0</span> Words Learned
                     </div>
-                    <div class="drawer-title">
-                        <svg class="drawer-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="2">
-                            <path d="M12 2L2 7l10 5 10-5-10-5z" />
-                            <path d="M2 17l10 5 10-5" />
-                            <path d="M2 12l10 5 10-5" />
-                        </svg>
-                        <h3>Level Progress</h3>
-                    </div>
-                    <button class="drawer-toggle" aria-label="Toggle level progress">
-                        <svg class="chevron" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="2">
-                            <polyline points="6 9 12 15 18 9"></polyline>
-                        </svg>
-                    </button>
-                </div>
-                <div class="drawer-content">
-                    <div id="levelProgressContent" class="level-list">
+                    <div class="vocab-list" id="vocabList">
                         <!-- Populated by JS -->
                     </div>
                 </div>
             </div>
-
-            <!-- Vocabulary Progress Drawer -->
-            <div class="drawer" data-drawer="vocabulary">
-                <div class="drawer-header">
-                    <div class="drawer-title">
-                        <svg class="drawer-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="2">
-                            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-                            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-                        </svg>
-                        <h3>Vocabulary Progress</h3>
-                    </div>
-                    <button class="drawer-toggle" aria-label="Toggle vocabulary progress">
-                        <svg class="chevron" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="2">
-                            <polyline points="6 9 12 15 18 9"></polyline>
-                        </svg>
-                    </button>
-                </div>
-                <div class="drawer-content">
-                    <div id="vocabularyProgressContent">
-                        <div class="vocab-stats">
-                            <span id="vocabCount">0 / 0</span> Words Learned
-                        </div>
-                        <div class="vocab-list" id="vocabList">
-                            <!-- Populated by JS -->
-                        </div>
-                    </div>
-                </div>
             </div>
 
             <!-- Current Quest Details Drawer -->
