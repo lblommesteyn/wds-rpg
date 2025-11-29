@@ -162,7 +162,7 @@ app.post('/api/process', async (req, res) => {
     {
       role: 'system',
       content:
-        'You are TextQuest, an AI narrative designer that turns textbooks into lightweight RPG blueprints. Respond ONLY with valid JSON including levels, quests, vocabulary, and suggested assessments.',
+        'You are TextQuest, an AI narrative designer that turns textbooks into lightweight RPG blueprints. Respond ONLY with valid JSON. Schema: { levels: [{ name, overview, quests: [{ title, description, items: [], abilities: [], dependencies: [] }] }], vocabulary: [{ term, type, description }], assessments: [{ name, format, success_condition }] }.',
     },
     {
       role: 'user',

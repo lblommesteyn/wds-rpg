@@ -144,7 +144,8 @@ function spawnObstacle() {
         color = '#31c2ff'; // Blue for knowledge
         if (vocabulary.length > 0) {
             const term = vocabulary[Math.floor(Math.random() * vocabulary.length)];
-            content = term.term;
+            // Handle both object (term.term) and string formats
+            content = (typeof term === 'object' && term.term) ? term.term : term;
         } else {
             content = "Knowledge";
         }
