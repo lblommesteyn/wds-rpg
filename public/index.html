@@ -50,13 +50,16 @@
           </label>
         </div>
         <div class="upload-row">
-          <label class="file-label">
-            <span>Upload PDF or text</span>
-            <input type="file" id="uploadFile" accept=".pdf,.txt,.md,.rtf" />
-          </label>
+          <form id="uploadForm" enctype="multipart/form-data" style="display: contents;">
+            <label class="file-label">
+              <span>Upload PDF or text</span>
+              <input type="file" name="uploadFile" id="uploadFile" accept=".pdf,.txt,.md,.rtf" />
+            </label>
+          </form>
           <button id="clearInput" class="ghost-button" type="button">Clear text</button>
         </div>
         <p id="uploadMessage" class="helper-text"></p>
+        <div id="message" style="color:white; margin-top:5px;"></div>
         <label class="full-width">
           <span>Textbook excerpt</span>
           <textarea id="textInput" rows="8" placeholder="Paste chapter text or upload a snippet..."></textarea>

@@ -1,12 +1,29 @@
 const express = require('express');
+const multer = require('multer');
+const fs = require('fs');
+const pdfParse = require('pdf-parse')
 const cors = require('cors');
 const path = require('path');
+const { execSync } = require('child_process');
+const pdfToImages = require('./pdfToImages');
 require('dotenv').config();
 
 const fetch = (...args) => import('node-fetch').then(({ default: fetchFn }) => fetchFn(...args));
 const GraphPersistence = require('./lib/persistence');
 const TopicGraphGenerator = require('./lib/graphGenerator');
 const EmbeddingsManager = require('./lib/embeddings');
+
+// Configure storage for uploaded files
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'uploads/'); // Files will be saved in the 'uploads/' directory
+  },
+  filename: function (req, file, cb) {
+    const sanitized = file.originalname.replace(/\s+/g, '_')
+    cb(null, `${sanitized}`);
+  }
+});
+const upload = multer({ storage: storage });
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -78,9 +95,6 @@ const sampleNarrative = {
   ],
 };
 
-const persistence = new GraphPersistence(DATA_DIR);
-const embeddingsManager = new EmbeddingsManager(process.env.OPENAI_API_KEY, 'openai');
-
 persistence.initializeDirectory().catch((error) => {
   console.error('Failed to initialize graph data directory', error);
 });
@@ -120,6 +134,9 @@ app.post('/api/process', async (req, res) => {
   try {
     const { content, usage } = await callGroq(messages, { responseFormat: 'json_object' });
     const structured = safeJSON(content) ?? { raw: content };
+    console.log("=== /api/process OUTPUT ===");
+    console.log(JSON.stringify(structured, null, 2));
+    console.log("===========================");
     return res.json({ title, structured, usage, via: 'groq' });
   } catch (error) {
     if (isMissingKeyError(error)) {
@@ -157,6 +174,9 @@ app.post('/api/narrative', async (req, res) => {
   try {
     const { content, usage } = await callGroq(messages, { responseFormat: 'json_object' });
     const narrative = safeJSON(content) ?? { raw: content };
+    console.log("=== /api/narrative OUTPUT ===");
+    console.log(JSON.stringify(narrative, null, 2));
+    console.log("==============================");
     return res.json({ narrative, usage, via: 'groq' });
   } catch (error) {
     if (isMissingKeyError(error)) {
@@ -170,6 +190,7 @@ app.post('/api/narrative', async (req, res) => {
     return res.status(500).json({ error: 'Failed to craft narrative content' });
   }
 });
+
 
 app.post('/api/graphs/from-structure', async (req, res) => {
   const { structured, title = 'Untitled Textbook', focus = 'general', savePersistently = false } = req.body ?? {};
@@ -263,12 +284,68 @@ app.post('/api/embeddings/similarity', async (req, res) => {
     return res.json({
       success: true,
       texts,
-      embeddings,
       similarityMatrix: matrix,
     });
   } catch (error) {
     console.error('[embeddings] Failed to compute similarity', error);
     return res.status(500).json({ error: 'Failed to compute similarity' });
+  }
+});
+
+async function runOCR(pdfPath) {
+  try {
+    const images = await pdfToImages(pdfPath);
+    let fullText = "";
+
+    const pythonPath = path.join(__dirname, "ocr_env", "Scripts", "python.exe");
+
+    for (const img of images) {
+      console.log("Running OCR on:", img);
+      const command = `"${pythonPath}" ocr.py "${img}"`;
+      const output = execSync(command, { encoding: "utf-8" });
+      console.log("OCR raw output:", output);
+
+      const jsonOut = JSON.parse(output);
+      fullText += jsonOut.ocr_text + "\n";
+    }
+
+    return fullText.trim();
+  } catch (err) {
+    console.error("OCR failed:", err);
+    return "";
+  }
+}
+
+app.post('/upload', upload.single('uploadFile'), async (req, res) => {
+  const forceOCR = req.query.forceOCR === "1";
+
+  if (!req.file) {
+    return res.status(400).json({ message: 'No file uploaded.' });
+  }
+
+  try {
+    const dataBuffer = fs.readFileSync(req.file.path);
+    const pdfData = await pdfParse(dataBuffer);
+
+    let extractedText = pdfData.text || "";
+
+    const isWeak = extractedText.trim().length < 50;
+    const hasSuspectPages = pdfData.numpages > 0 && extractedText.split("\n").length < 5;
+
+    if (forceOCR || isWeak || hasSuspectPages) {
+      console.log("Forcing OCR...");
+      const ocrText = await runOCR(req.file.path);
+      extractedText = ocrText || extractedText;
+    }
+
+    res.status(200).json({
+      message: "File Uploaded and Parsed Successfully",
+      extractedText
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Failed to extract PDF content.' });
   }
 });
 
@@ -295,7 +372,7 @@ async function callGroq(messages, { responseFormat } = {}) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+      'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
     },
     body: JSON.stringify(body),
   });
@@ -327,3 +404,5 @@ function safeJSON(text) {
 function isMissingKeyError(error) {
   return typeof error?.message === 'string' && error.message.includes('GROQ_API_KEY');
 }
+
+

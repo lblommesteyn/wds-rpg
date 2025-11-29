@@ -15,6 +15,7 @@ const clearInputButton = document.getElementById('clearInput');
 const graphButton = document.getElementById('graphButton');
 const graphStatus = document.getElementById('graphStatus');
 const graphOutput = document.getElementById('graphOutput');
+const form = document.getElementById('uploadForm');
 
 let currentStructure = null;
 
@@ -41,10 +42,12 @@ processButton.addEventListener('click', async () => {
 
     const result = await response.json();
     renderStructure(result);
-  } catch (error) {
+  }
+  catch (error) {
     structureOutput.classList.remove('empty-state');
     structureOutput.innerHTML = `<div class="card"><h4>Error</h4><p>${error.message}</p></div>`;
-  } finally {
+  }
+  finally {
     toggleButtons(false);
     setStatus(processStatus, 'Idle', false);
   }
@@ -141,6 +144,39 @@ clearInputButton?.addEventListener('click', () => {
   uploadMessage.textContent = '';
 });
 
+if (form) {
+  form.addEventListener('change', () => {
+    form.dispatchEvent(new Event('submit'));
+  });
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+
+    const fileInput = document.getElementById('uploadFile');
+    const file = fileInput.files[0];
+
+    const formData = new FormData();
+    formData.append('uploadFile', file);
+
+    try {
+      const response = await fetch('/upload?forceOCR=1', {
+        method: 'POST',
+        body: formData,
+      })
+
+      const data = await response.json()
+      document.getElementById('message').innerText = data.message;
+
+      if (data.extractedText) {
+        textInput.value = data.extractedText
+      }
+
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      document.getElementById('message').innerText = 'Error uploading file.';
+    }
+  });
+}
 function renderStructure(result) {
   const { structured, via, title } = result;
   currentStructure = structured;
@@ -190,8 +226,8 @@ function renderQuests(quests = []) {
   return `
     <div>
       ${quests
-        .map(
-          (quest) => `
+      .map(
+        (quest) => `
         <div class="card">
           <h4>${quest.title}</h4>
           <p>${quest.description || ''}</p>
@@ -200,8 +236,8 @@ function renderQuests(quests = []) {
           <p><strong>Dependencies:</strong> ${quest.dependencies?.join(', ') || 'None'}</p>
         </div>
       `
-        )
-        .join('')}
+      )
+      .join('')}
     </div>
   `;
 }
@@ -251,9 +287,8 @@ function renderGraph(result) {
   const nodesPreview = (graph.nodes || []).slice(0, 6);
 
   graphOutput.classList.remove('empty-state');
-  let html = `<div class="badge">Concept graph | ${graph.metadata?.embeddingModel || 'mock'}${
-    persistence?.filename ? ' · saved' : ''
-  }</div>`;
+  let html = `<div class="badge">Concept graph | ${graph.metadata?.embeddingModel || 'mock'}${persistence?.filename ? ' · saved' : ''
+    }</div>`;
 
   html += `<article class="card">
     <h4>Overview</h4>
@@ -264,9 +299,8 @@ function renderGraph(result) {
     html += `<article class="card"><h4>Topics</h4>${topics
       .map(([topic, data]) => {
         const avg = typeof data.avgDifficulty === 'number' ? data.avgDifficulty.toFixed(1) : 'n/a';
-        return `<p><strong>${topic}</strong> · ${data.nodeCount} concepts · avg difficulty ${avg} · types: ${
-          data.types?.join(', ') || 'n/a'
-        }</p>`;
+        return `<p><strong>${topic}</strong> · ${data.nodeCount} concepts · avg difficulty ${avg} · types: ${data.types?.join(', ') || 'n/a'
+          }</p>`;
       })
       .join('')}</article>`;
   }

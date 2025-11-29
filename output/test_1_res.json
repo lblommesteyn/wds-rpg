@@ -1,0 +1,166 @@
+{
+    "input_path": "./uploads/test_1.png",
+    "page_index": null,
+    "model_settings": {
+        "use_doc_preprocessor": false,
+        "use_textline_orientation": false
+    },
+    "dt_polys": [
+        [
+            [
+                8,
+                9
+            ],
+            [
+                698,
+                11
+            ],
+            [
+                698,
+                33
+            ],
+            [
+                8,
+                31
+            ]
+        ],
+        [
+            [
+                73,
+                57
+            ],
+            [
+                833,
+                57
+            ],
+            [
+                833,
+                79
+            ],
+            [
+                73,
+                79
+            ]
+        ],
+        [
+            [
+                71,
+                88
+            ],
+            [
+                317,
+                86
+            ],
+            [
+                317,
+                109
+            ],
+            [
+                71,
+                111
+            ]
+        ]
+    ],
+    "text_det_params": {
+        "limit_side_len": 64,
+        "limit_type": "min",
+        "thresh": 0.3,
+        "max_side_limit": 4000,
+        "box_thresh": 0.6,
+        "unclip_ratio": 1.5
+    },
+    "text_type": "general",
+    "textline_orientation_angles": [
+        -1,
+        -1,
+        -1
+    ],
+    "text_rec_score_thresh": 0.0,
+    "return_word_box": false,
+    "rec_texts": [
+        "You've entered Canada and one of the following situations applies to you:",
+        "You're applying for a study permit extension at the same DLl and level of study as",
+        "your current study permit."
+    ],
+    "rec_scores": [
+        0.971337616443634,
+        0.9562746286392212,
+        0.976233720779419
+    ],
+    "rec_polys": [
+        [
+            [
+                8,
+                9
+            ],
+            [
+                698,
+                11
+            ],
+            [
+                698,
+                33
+            ],
+            [
+                8,
+                31
+            ]
+        ],
+        [
+            [
+                73,
+                57
+            ],
+            [
+                833,
+                57
+            ],
+            [
+                833,
+                79
+            ],
+            [
+                73,
+                79
+            ]
+        ],
+        [
+            [
+                71,
+                88
+            ],
+            [
+                317,
+                86
+            ],
+            [
+                317,
+                109
+            ],
+            [
+                71,
+                111
+            ]
+        ]
+    ],
+    "rec_boxes": [
+        [
+            8,
+            9,
+            698,
+            33
+        ],
+        [
+            73,
+            57,
+            833,
+            79
+        ],
+        [
+            71,
+            86,
+            317,
+            111
+        ]
+    ]
+}
